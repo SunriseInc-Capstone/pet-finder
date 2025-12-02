@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:petalert/shared/models/pet.dart';
 import 'package:petalert/shared/services/pet_storage.dart';
 import 'add_pet_screen.dart';
+import 'package:petalert/features/pet_profile/pet_detail_screen.dart';
 
 class PetListScreen extends StatefulWidget {
   const PetListScreen({super.key});
@@ -37,7 +38,6 @@ class _PetListScreenState extends State<PetListScreen> {
   }
 
   Future<void> _editPet(Pet pet, int index) async {
-    // open AddPetScreen pre-filled with this pet
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => AddPetScreen(
@@ -56,7 +56,10 @@ class _PetListScreenState extends State<PetListScreen> {
         title: const Text('Delete Pet'),
         content: const Text('Are you sure you want to delete this pet?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
@@ -80,7 +83,10 @@ class _PetListScreenState extends State<PetListScreen> {
       appBar: AppBar(
         title: const Text('Pet Profiles'),
         actions: [
-          IconButton(onPressed: _loadPets, icon: const Icon(Icons.refresh_rounded)),
+          IconButton(
+            onPressed: _loadPets,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -105,6 +111,7 @@ class _PetListScreenState extends State<PetListScreen> {
                     itemCount: _pets.length,
                     itemBuilder: (context, i) {
                       final pet = _pets[i];
+
                       return Dismissible(
                         key: ValueKey(pet.id),
                         background: Container(
@@ -121,29 +128,62 @@ class _PetListScreenState extends State<PetListScreen> {
                         ),
                         confirmDismiss: (_) async {
                           await _deletePet(i);
-                          return false; // handled manually
+                          return false; // we manage the delete ourselves
                         },
                         child: Card(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                           margin: const EdgeInsets.symmetric(vertical: 8),
                           child: ListTile(
                             contentPadding: const EdgeInsets.all(12),
-                            leading: CircleAvatar(
-                              radius: 28,
-                              backgroundColor: cs.primary.withValues(alpha: 0.2),
-                              backgroundImage: (pet.photoPath != null && File(pet.photoPath!).existsSync())
-                                  ? FileImage(File(pet.photoPath!))
-                                  : null,
-                              child: (pet.photoPath == null)
-                                  ? const Icon(Icons.pets_rounded, size: 30)
-                                  : null,
+
+                            leading: Hero(
+                              tag: 'pet-avatar-${pet.id}',
+                              child: CircleAvatar(
+                                radius: 28,
+                                backgroundColor:
+                                    cs.primary.withValues(alpha: 0.2),
+                                backgroundImage: (pet.photoPath != null &&
+                                        File(pet.photoPath!).existsSync())
+                                    ? FileImage(File(pet.photoPath!))
+                                    : null,
+                                child: (pet.photoPath == null)
+                                    ? const Icon(Icons.pets_rounded, size: 30)
+                                    : null,
+                              ),
                             ),
-                            title: Text(pet.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('${pet.species}${pet.age != null ? '  •  ${pet.age} yr' : ''}'),
+
+                            title: Text(
+                              pet.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${pet.species}${pet.age != null ? '  •  ${pet.age} yr' : ''}',
+                            ),
+
                             trailing: IconButton(
                               icon: const Icon(Icons.edit_rounded),
                               onPressed: () => _editPet(pet, i),
                             ),
+
+                            onTap: () async {
+                              final changed =
+                                  await Navigator.of(context).push<bool>(
+                                MaterialPageRoute(
+                                  builder: (_) => PetDetailScreen(
+                                    pet: pet,
+                                    index: i,
+                                  ),
+                                ),
+                              );
+
+                              if (changed == true) {
+                                _loadPets();
+                              }
+                            },
                           ),
                         ),
                       );

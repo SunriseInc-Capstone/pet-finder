@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:petalert/features/pet_profile/add_pet_screen.dart';
 import 'package:petalert/features/pet_profile/pet_list_screen.dart';
+import 'package:petalert/features/missing_alert/missing_alert_list_screen.dart';
 
 void main() => runApp(const PetAlertApp());
 
@@ -67,7 +68,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // HERO
+                // HERO SECTION
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -112,7 +113,6 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // NOTE: no 'const' here because one tile uses context in onTap.
                 GridView.count(
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
@@ -120,6 +120,7 @@ class HomeScreen extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
+                    // PET PROFILES TILE
                     _FeatureCard(
                       'Pet Profiles',
                       Icons.badge_rounded,
@@ -130,10 +131,39 @@ class HomeScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    const _FeatureCard('Contacts', Icons.contact_phone_rounded, Colors.indigo),
-                    const _FeatureCard('Missing Alert', Icons.campaign_rounded, Colors.orange),
-                    const _FeatureCard('Reminders', Icons.event_available_rounded, Colors.pinkAccent),
-                    const _FeatureCard('Tips & Foods', Icons.health_and_safety_rounded, Colors.green),
+
+                    // CONTACTS (placeholder)
+                    const _FeatureCard(
+                      'Contacts',
+                      Icons.contact_phone_rounded,
+                      Colors.indigo,
+                    ),
+
+                    // MISSING ALERT TILE -> now navigates correctly
+                    _FeatureCard(
+                      'Missing Alert',
+                      Icons.campaign_rounded,
+                      Colors.orange,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const MissingAlertListScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    const _FeatureCard(
+                      'Reminders',
+                      Icons.event_available_rounded,
+                      Colors.pinkAccent,
+                    ),
+
+                    const _FeatureCard(
+                      'Tips & Foods',
+                      Icons.health_and_safety_rounded,
+                      Colors.green,
+                    ),
                   ],
                 ),
 
@@ -172,11 +202,19 @@ class HomeScreen extends StatelessWidget {
                         },
                       ),
                       const Divider(height: 1),
-                      const ListTile(
-                        leading: Icon(Icons.share_rounded, color: Colors.orange),
-                        title: Text('Create a missing alert'),
-                        subtitle: Text('Generate sharable text/poster'),
-                        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16),
+
+                      ListTile(
+                        leading: const Icon(Icons.share_rounded, color: Colors.orange),
+                        title: const Text('Create a missing alert'),
+                        subtitle: const Text('Generate sharable text/poster'),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const MissingAlertListScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -194,7 +232,7 @@ class _FeatureCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
-  final VoidCallback? onTap; // 
+  final VoidCallback? onTap;
 
   const _FeatureCard(this.title, this.icon, this.color, {this.onTap});
 
@@ -214,7 +252,7 @@ class _FeatureCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap, // 
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
