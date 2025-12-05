@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:petalert/shared/models/missing_alert.dart';
 import 'package:petalert/shared/services/missing_alert_storage.dart';
 
@@ -35,18 +36,17 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
   }
 
   Future<void> _toggleStatus() async {
-    final newStatus =
-        _alert.status.toLowerCase() == 'active' ? 'resolved' : 'active';
+    final newStatus = _alert.status.toLowerCase() == 'active'
+        ? 'resolved'
+        : 'active';
 
     setState(() => _updating = true);
     try {
       final list = await MissingAlertStorage.loadAlerts();
 
-      // Prefer index if it still matches, otherwise search by id.
+      // Try to find the same alert in storage
       int idx = widget.index;
-      if (idx < 0 ||
-          idx >= list.length ||
-          list[idx].id != _alert.id) {
+      if (idx < 0 || idx >= list.length || list[idx].id != _alert.id) {
         idx = list.indexWhere((a) => a.id == _alert.id);
       }
       if (idx == -1) return;
@@ -79,8 +79,9 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Alert'),
-        content:
-            const Text('Are you sure you want to delete this missing alert?'),
+        content: const Text(
+          'Are you sure you want to delete this missing alert?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -101,7 +102,50 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
     await MissingAlertStorage.saveAlerts(list);
 
     if (!mounted) return;
-    Navigator.of(context).pop(true); // signal to list screen that data changed
+    Navigator.of(context).pop(true); // notify list screen to refresh
+  }
+
+  void _shareAlert() {
+    final buffer = StringBuffer();
+
+    buffer.writeln('🚨 Missing Pet Alert: ${_alert.petName}');
+    buffer.writeln('');
+
+    if (_alert.lastSeenLocation != null &&
+        _alert.lastSeenLocation!.trim().isNotEmpty) {
+      buffer.writeln('📍 Last seen near: ${_alert.lastSeenLocation}');
+    }
+
+    if (_alert.lastSeenAt != null) {
+      buffer.writeln('🕒 When: ${_formatDateTime(_alert.lastSeenAt)}');
+    }
+
+    if (_alert.notes != null && _alert.notes!.trim().isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('ℹ️ Details: ${_alert.notes!.trim()}');
+    }
+
+    if (_alert.contactName != null || _alert.contactPhone != null) {
+      buffer.writeln('');
+      buffer.write('📞 Contact: ');
+      if (_alert.contactName != null && _alert.contactName!.trim().isNotEmpty) {
+        buffer.write(_alert.contactName!.trim());
+        if (_alert.contactPhone != null &&
+            _alert.contactPhone!.trim().isNotEmpty) {
+          buffer.write(' – ');
+        }
+      }
+      if (_alert.contactPhone != null &&
+          _alert.contactPhone!.trim().isNotEmpty) {
+        buffer.write(_alert.contactPhone!.trim());
+      }
+      buffer.writeln();
+    }
+
+    buffer.writeln('');
+    buffer.writeln('Shared via PetAlert 🐾');
+
+    Share.share(buffer.toString());
   }
 
   @override
@@ -115,6 +159,11 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
       appBar: AppBar(
         title: Text('Alert: ${_alert.petName}'),
         actions: [
+          IconButton(
+            onPressed: _shareAlert,
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Share alert',
+          ),
           IconButton(
             onPressed: _deleteAlert,
             icon: const Icon(Icons.delete_rounded),
@@ -137,8 +186,7 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
                 ),
                 child: Column(
                   children: [
-                    Icon(Icons.campaign_rounded,
-                        size: 48, color: cs.primary),
+                    Icon(Icons.campaign_rounded, size: 48, color: cs.primary),
                     const SizedBox(height: 12),
                     Text(
                       _alert.petName,
@@ -150,12 +198,14 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.08),
+                        color: statusColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: statusColor.withOpacity(0.6),
+                          color: statusColor.withValues(alpha: 0.6),
                         ),
                       ),
                       child: Text(
@@ -290,10 +340,7 @@ class _InfoSection extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           ...children,
@@ -320,19 +367,11 @@ class _InfoRow extends StatelessWidget {
             width: 90,
             child: Text(
               '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             ),
           ),
           const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
         ],
       ),
     );

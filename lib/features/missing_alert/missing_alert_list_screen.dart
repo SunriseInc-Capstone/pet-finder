@@ -32,9 +32,7 @@ class _MissingAlertListScreenState extends State<MissingAlertListScreen> {
 
   Future<void> _addAlert() async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => const CreateMissingAlertScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const CreateMissingAlertScreen()),
     );
 
     if (ok == true) {
@@ -47,7 +45,9 @@ class _MissingAlertListScreenState extends State<MissingAlertListScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Alert'),
-        content: const Text('Are you sure you want to delete this missing alert?'),
+        content: const Text(
+          'Are you sure you want to delete this missing alert?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -95,76 +95,75 @@ class _MissingAlertListScreenState extends State<MissingAlertListScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _alerts.isEmpty
-                ? const _EmptyState()
-                : RefreshIndicator(
-                    onRefresh: _loadAlerts,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _alerts.length,
-                      itemBuilder: (context, i) {
-                        final alert = _alerts[i];
+            ? const _EmptyState()
+            : RefreshIndicator(
+                onRefresh: _loadAlerts,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _alerts.length,
+                  itemBuilder: (context, i) {
+                    final alert = _alerts[i];
 
-                        return Dismissible(
-                          key: ValueKey(alert.id),
-                          background: Container(
-                            color: Colors.redAccent,
-                            alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.only(left: 20),
-                            child: const Icon(Icons.delete, color: Colors.white),
+                    return Dismissible(
+                      key: ValueKey(alert.id),
+                      background: Container(
+                        color: Colors.redAccent,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.only(left: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      secondaryBackground: Container(
+                        color: Colors.redAccent,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      confirmDismiss: (_) async {
+                        await _deleteAlert(i);
+                        return false;
+                      },
+
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(12),
+
+                          // Leading status dot
+                          leading: _StatusDot(status: alert.status),
+
+                          // Title + subtitle
+                          title: Text(
+                            alert.petName,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          secondaryBackground: Container(
-                            color: Colors.redAccent,
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            child: const Icon(Icons.delete, color: Colors.white),
-                          ),
-                          confirmDismiss: (_) async {
-                            await _deleteAlert(i);
-                            return false;
-                          },
-
-                          child: Card(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.all(12),
-
-                              // Leading status dot
-                              leading: _StatusDot(status: alert.status),
-
-                              // Title + subtitle
-                              title: Text(
-                                alert.petName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (alert.lastSeenLocation != null &&
+                                  alert.lastSeenLocation!.isNotEmpty)
+                                Text(
+                                  'Last seen: ${alert.lastSeenLocation}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (alert.lastSeenLocation != null &&
-                                      alert.lastSeenLocation!.isNotEmpty)
-                                    Text(
-                                      'Last seen: ${alert.lastSeenLocation}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  if (alert.lastSeenAt != null)
-                                    Text(
-                                      'At: ${alert.lastSeenAt}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                ],
-                              ),
+                              if (alert.lastSeenAt != null)
+                                Text(
+                                  'At: ${alert.lastSeenAt}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                            ],
+                          ),
 
-                              // Status badge
-                              trailing: _StatusChip(status: alert.status),
+                          // Status badge
+                          trailing: _StatusChip(status: alert.status),
 
-                              // 🚀 Open detail screen
-                              onTap: () async {
-                                final changed = await Navigator.of(context).push<bool>(
+                          // 🚀 Open detail screen
+                          onTap: () async {
+                            final changed = await Navigator.of(context)
+                                .push<bool>(
                                   MaterialPageRoute(
                                     builder: (_) => MissingAlertDetailScreen(
                                       alert: alert,
@@ -173,16 +172,16 @@ class _MissingAlertListScreenState extends State<MissingAlertListScreen> {
                                   ),
                                 );
 
-                                if (changed == true) {
-                                  _loadAlerts();
-                                }
-                              },
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                            if (changed == true) {
+                              _loadAlerts();
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
       ),
     );
   }
@@ -204,10 +203,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 16),
             const Text(
               'No missing alerts yet.',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -236,7 +232,7 @@ class _StatusDot extends StatelessWidget {
       width: 18,
       height: 18,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         shape: BoxShape.circle,
         border: Border.all(color: color, width: 2),
       ),
@@ -257,9 +253,9 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.6)),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
       ),
       child: Text(
         label,

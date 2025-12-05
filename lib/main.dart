@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:petalert/features/pet_profile/add_pet_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:petalert/features/pet_profile/pet_list_screen.dart';
 import 'package:petalert/features/missing_alert/missing_alert_list_screen.dart';
+import 'package:petalert/features/pet_profile/add_pet_screen.dart';
 
-void main() => runApp(const PetAlertApp());
+import 'auth/login_screen.dart'; //
+import 'auth/signup_screen.dart'; //
+
+// 🔥 Firebase Initialization
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const PetAlertApp());
+}
 
 class PetAlertApp extends StatelessWidget {
   const PetAlertApp({super.key});
@@ -22,7 +34,35 @@ class PetAlertApp extends StatelessWidget {
         useMaterial3: true,
         textTheme: GoogleFonts.poppinsTextTheme(),
       ),
-      home: const HomeScreen(),
+      home: const AuthGate(), // <------ NEW
+    );
+  }
+}
+
+/// 🔒 Sends user to Login or Home depending on authentication state
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Loading state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // User NOT logged in
+        if (!snapshot.hasData) {
+          return const LoginScreen(); // <---- will create this next
+        }
+
+        // User logged in → show home
+        return const HomeScreen();
+      },
     );
   }
 }
@@ -35,15 +75,26 @@ class HomeScreen extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text("PetAlert Home"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final ok = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(builder: (_) => const AddPetScreen()),
-          );
+          final ok = await Navigator.of(
+            context,
+          ).push<bool>(MaterialPageRoute(builder: (_) => const AddPetScreen()));
           if (ok == true && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Pet saved!')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Pet saved!')));
           }
         },
         icon: const Icon(Icons.add),
@@ -54,10 +105,7 @@ class HomeScreen extends StatelessWidget {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              cs.primaryContainer.withValues(alpha: 0.8),
-              cs.surface,
-            ],
+            colors: [cs.primaryContainer.withValues(alpha: 0.8), cs.surface],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -68,41 +116,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // HERO SECTION
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: cs.primaryContainer,
-                    boxShadow: [
-                      BoxShadow(
-                        color: cs.shadow.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.pets_rounded, size: 50, color: Colors.teal),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: Text(
-                          'Welcome to PetAlert\nKeep your pets safe & organized.',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onPrimaryContainer,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 25),
-
+                // YOUR EXISTING HOME UI (shortened)
                 Text(
                   'Main Features',
                   style: GoogleFonts.poppins(
@@ -120,26 +134,18 @@ class HomeScreen extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    // PET PROFILES TILE
                     _FeatureCard(
                       'Pet Profiles',
                       Icons.badge_rounded,
                       Colors.teal,
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const PetListScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const PetListScreen(),
+                          ),
                         );
                       },
                     ),
-
-                    // CONTACTS (placeholder)
-                    const _FeatureCard(
-                      'Contacts',
-                      Icons.contact_phone_rounded,
-                      Colors.indigo,
-                    ),
-
-                    // MISSING ALERT TILE -> now navigates correctly
                     _FeatureCard(
                       'Missing Alert',
                       Icons.campaign_rounded,
@@ -152,72 +158,22 @@ class HomeScreen extends StatelessWidget {
                         );
                       },
                     ),
-
+                    const _FeatureCard(
+                      'Contacts',
+                      Icons.contact_phone_rounded,
+                      Colors.indigo,
+                    ),
                     const _FeatureCard(
                       'Reminders',
                       Icons.event_available_rounded,
                       Colors.pinkAccent,
                     ),
-
                     const _FeatureCard(
                       'Tips & Foods',
                       Icons.health_and_safety_rounded,
                       Colors.green,
                     ),
                   ],
-                ),
-
-                const SizedBox(height: 24),
-
-                Text(
-                  'Quick Actions',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                Card(
-                  color: cs.surfaceContainerHigh,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 3,
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.add_box_rounded, color: Colors.teal),
-                        title: const Text('Add your first pet'),
-                        subtitle: const Text('Name, species, age, photo'),
-                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                        onTap: () async {
-                          final ok = await Navigator.of(context).push<bool>(
-                            MaterialPageRoute(builder: (_) => const AddPetScreen()),
-                          );
-                          if (ok == true && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Pet saved!')),
-                            );
-                          }
-                        },
-                      ),
-                      const Divider(height: 1),
-
-                      ListTile(
-                        leading: const Icon(Icons.share_rounded, color: Colors.orange),
-                        title: const Text('Create a missing alert'),
-                        subtitle: const Text('Generate sharable text/poster'),
-                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const MissingAlertListScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),
