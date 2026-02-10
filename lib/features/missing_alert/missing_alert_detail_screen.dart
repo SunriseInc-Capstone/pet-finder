@@ -31,20 +31,19 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
   String _formatDateTime(DateTime? dt) {
     if (dt == null) return 'Not set';
     final s = dt.toLocal().toString();
-    // yyyy-MM-dd HH:mm
-    return s.substring(0, 16);
+    return s.substring(0, 16); // yyyy-MM-dd HH:mm
   }
 
+  bool _hasText(String? s) => s != null && s.trim().isNotEmpty;
+
   Future<void> _toggleStatus() async {
-    final newStatus = _alert.status.toLowerCase() == 'active'
-        ? 'resolved'
-        : 'active';
+    final newStatus =
+        _alert.status.toLowerCase() == 'active' ? 'resolved' : 'active';
 
     setState(() => _updating = true);
     try {
       final list = await MissingAlertStorage.loadAlerts();
 
-      // Try to find the same alert in storage
       int idx = widget.index;
       if (idx < 0 || idx >= list.length || list[idx].id != _alert.id) {
         idx = list.indexWhere((a) => a.id == _alert.id);
@@ -55,9 +54,7 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
       list[idx] = updated;
       await MissingAlertStorage.saveAlerts(list);
 
-      setState(() {
-        _alert = updated;
-      });
+      setState(() => _alert = updated);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -79,9 +76,7 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Alert'),
-        content: const Text(
-          'Are you sure you want to delete this missing alert?',
-        ),
+        content: const Text('Are you sure you want to delete this missing alert?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -102,50 +97,54 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
     await MissingAlertStorage.saveAlerts(list);
 
     if (!mounted) return;
-    Navigator.of(context).pop(true); // notify list screen to refresh
+    Navigator.of(context).pop(true);
   }
 
+  /// ✅ “Share output” = this text
   void _shareAlert() {
-    final buffer = StringBuffer();
+    final b = StringBuffer();
 
-    buffer.writeln('🚨 Missing Pet Alert: ${_alert.petName}');
-    buffer.writeln('');
+    b.writeln('🚨 Missing Pet Alert: ${_alert.petName}');
+    b.writeln('');
 
-    if (_alert.lastSeenLocation != null &&
-        _alert.lastSeenLocation!.trim().isNotEmpty) {
-      buffer.writeln('📍 Last seen near: ${_alert.lastSeenLocation}');
+    if (_hasText(_alert.lastSeenLocation)) {
+      b.writeln('📍 Last seen near: ${_alert.lastSeenLocation!.trim()}');
     }
 
     if (_alert.lastSeenAt != null) {
-      buffer.writeln('🕒 When: ${_formatDateTime(_alert.lastSeenAt)}');
+      b.writeln('🕒 When: ${_formatDateTime(_alert.lastSeenAt)}');
     }
 
-    if (_alert.notes != null && _alert.notes!.trim().isNotEmpty) {
-      buffer.writeln('');
-      buffer.writeln('ℹ️ Details: ${_alert.notes!.trim()}');
+    // ✅ NEW: optional details
+    if (_hasText(_alert.microchipId)) {
+      b.writeln('🧾 Microchip ID: ${_alert.microchipId!.trim()}');
+    }
+    if (_hasText(_alert.distinguishingMarks)) {
+      b.writeln('🔎 Distinguishing marks: ${_alert.distinguishingMarks!.trim()}');
     }
 
-    if (_alert.contactName != null || _alert.contactPhone != null) {
-      buffer.writeln('');
-      buffer.write('📞 Contact: ');
-      if (_alert.contactName != null && _alert.contactName!.trim().isNotEmpty) {
-        buffer.write(_alert.contactName!.trim());
-        if (_alert.contactPhone != null &&
-            _alert.contactPhone!.trim().isNotEmpty) {
-          buffer.write(' – ');
-        }
+    if (_hasText(_alert.notes)) {
+      b.writeln('');
+      b.writeln('ℹ️ Details: ${_alert.notes!.trim()}');
+    }
+
+    if (_hasText(_alert.contactName) || _hasText(_alert.contactPhone)) {
+      b.writeln('');
+      b.write('📞 Contact: ');
+      if (_hasText(_alert.contactName)) {
+        b.write(_alert.contactName!.trim());
+        if (_hasText(_alert.contactPhone)) b.write(' – ');
       }
-      if (_alert.contactPhone != null &&
-          _alert.contactPhone!.trim().isNotEmpty) {
-        buffer.write(_alert.contactPhone!.trim());
+      if (_hasText(_alert.contactPhone)) {
+        b.write(_alert.contactPhone!.trim());
       }
-      buffer.writeln();
+      b.writeln();
     }
 
-    buffer.writeln('');
-    buffer.writeln('Shared via PetAlert 🐾');
+    b.writeln('');
+    b.writeln('Shared via PetAlert 🐾');
 
-    Share.share(buffer.toString());
+    Share.share(b.toString());
   }
 
   @override
@@ -239,6 +238,27 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
 
               const SizedBox(height: 16),
 
+              // ✅ NEW SECTION
+              _InfoSection(
+                title: 'Optional details',
+                children: [
+                  _InfoRow(
+                    label: 'Microchip ID',
+                    value: _hasText(_alert.microchipId)
+                        ? _alert.microchipId!.trim()
+                        : 'Not provided',
+                  ),
+                  _InfoRow(
+                    label: 'Marks',
+                    value: _hasText(_alert.distinguishingMarks)
+                        ? _alert.distinguishingMarks!.trim()
+                        : 'Not provided',
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
               _InfoSection(
                 title: 'Contact',
                 children: [
@@ -259,9 +279,7 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
                 title: 'Notes',
                 children: [
                   Text(
-                    (_alert.notes == null || _alert.notes!.trim().isEmpty)
-                        ? 'No extra notes.'
-                        : _alert.notes!.trim(),
+                    (!_hasText(_alert.notes)) ? 'No extra notes.' : _alert.notes!.trim(),
                     style: const TextStyle(fontSize: 15, height: 1.4),
                   ),
                 ],
@@ -297,9 +315,7 @@ class _MissingAlertDetailScreenState extends State<MissingAlertDetailScreen> {
                                   ? Icons.check_circle_rounded
                                   : Icons.restart_alt_rounded,
                             ),
-                      label: Text(
-                        isActive ? 'Mark as Resolved' : 'Mark as Active',
-                      ),
+                      label: Text(isActive ? 'Mark as Resolved' : 'Mark as Active'),
                     ),
                   ),
                   const SizedBox(width: 12),
