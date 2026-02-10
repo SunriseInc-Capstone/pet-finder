@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:petalert/shared/models/pet.dart';
-import 'package:petalert/shared/services/pet_storage.dart';
+import 'package:petalert/shared/services/pet_firestore_service.dart';
 
 class AddPetScreen extends StatefulWidget {
-  final Pet? existingPet;   // if provided -> edit mode
-  final int? index;         // position in list when editing
+  final Pet? existingPet; // if provided -> edit mode
 
-  const AddPetScreen({this.existingPet, this.index, super.key});
+  const AddPetScreen({this.existingPet, super.key});
 
   @override
   State<AddPetScreen> createState() => _AddPetScreenState();
@@ -17,6 +16,7 @@ class AddPetScreen extends StatefulWidget {
 
 class _AddPetScreenState extends State<AddPetScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final _nameCtrl = TextEditingController();
   final _ageCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
@@ -25,19 +25,23 @@ class _AddPetScreenState extends State<AddPetScreen> {
   File? _photoFile;
 
   final _picker = ImagePicker();
+  final _petFs = PetFirestoreService();
+
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    // Prefill when editing
+
     final pet = widget.existingPet;
     if (pet != null) {
       _nameCtrl.text = pet.name;
       _species = pet.species;
       if (pet.age != null) _ageCtrl.text = pet.age!.toString();
       _notesCtrl.text = pet.notes ?? '';
-      if (pet.photoPath != null) _photoFile = File(pet.photoPath!);
+      if (pet.photoPath != null) {
+        _photoFile = File(pet.photoPath!);
+      }
     }
   }
 
@@ -61,13 +65,43 @@ class _AddPetScreenState extends State<AddPetScreen> {
     }
   }
 
+  void _showPhotoPickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Choose from gallery'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickPhoto(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: const Text('Take a photo'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickPhoto(ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
 
     try {
-      // Keep same id when editing; otherwise generate a new one.
+      final isEdit = widget.existingPet != null;
+
       final id = widget.existingPet?.id ??
           DateTime.now().millisecondsSinceEpoch.toString();
 
@@ -75,9 +109,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
           ? null
           : int.tryParse(_ageCtrl.text.trim());
 
-      // If user didn’t change photo in edit mode, retain existing path.
-      final photoPath =
-          _photoFile?.path ?? widget.existingPet?.photoPath;
+      final photoPath = _photoFile?.path ?? widget.existingPet?.photoPath;
 
       final pet = Pet(
         id: id,
@@ -88,22 +120,14 @@ class _AddPetScreenState extends State<AddPetScreen> {
         photoPath: photoPath,
       );
 
-      final list = await PetStorage.loadPets();
-
-      if (widget.index != null &&
-          widget.index! >= 0 &&
-          widget.index! < list.length) {
-        // Edit
-        list[widget.index!] = pet;
+      if (isEdit) {
+        await _petFs.updatePet(pet);
       } else {
-        // Add
-        list.add(pet);
+        await _petFs.addPet(pet);
       }
 
-      await PetStorage.savePets(list);
-
       if (!mounted) return;
-      Navigator.of(context).pop(true); // success
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,7 +152,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
             key: _formKey,
             child: Column(
               children: [
-                // Photo picker
                 InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: _showPhotoPickerSheet,
@@ -177,7 +200,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 const SizedBox(height: 12),
 
                 DropdownButtonFormField<String>(
-                  initialValue: _species, // non-deprecated
+                  initialValue: _species,
                   items: const [
                     DropdownMenuItem(value: 'Dog', child: Text('Dog')),
                     DropdownMenuItem(value: 'Cat', child: Text('Cat')),
@@ -193,8 +216,9 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 TextFormField(
                   controller: _ageCtrl,
                   keyboardType: TextInputType.number,
-                  decoration:
-                      const InputDecoration(labelText: 'Age (years, optional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Age (years, optional)',
+                  ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return null;
                     final n = int.tryParse(v.trim());
@@ -208,8 +232,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 TextFormField(
                   controller: _notesCtrl,
                   maxLines: 3,
-                  decoration:
-                      const InputDecoration(labelText: 'Notes (optional)'),
+                  decoration: const InputDecoration(labelText: 'Notes (optional)'),
                 ),
 
                 const SizedBox(height: 20),
@@ -225,9 +248,11 @@ class _AddPetScreenState extends State<AddPetScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.check_rounded),
-                    label: Text(_saving
-                        ? (isEdit ? 'Saving changes...' : 'Saving...')
-                        : (isEdit ? 'Save Changes' : 'Save Pet')),
+                    label: Text(
+                      _saving
+                          ? (isEdit ? 'Saving changes...' : 'Saving...')
+                          : (isEdit ? 'Save Changes' : 'Save Pet'),
+                    ),
                   ),
                 ),
               ],
@@ -237,34 +262,4 @@ class _AddPetScreenState extends State<AddPetScreen> {
       ),
     );
   }
-
-  void _showPhotoPickerSheet() {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library_rounded),
-              title: const Text('Choose from gallery'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickPhoto(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_camera_rounded),
-              title: const Text('Take a photo'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickPhoto(ImageSource.camera);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
-
