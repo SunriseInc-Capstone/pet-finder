@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:petalert/shared/models/pet.dart';
 import 'package:petalert/shared/models/missing_alert.dart';
 import 'package:petalert/shared/services/pet_storage.dart';
-import 'package:petalert/shared/services/missing_alert_storage.dart';
+
+// --- NEW FIRESTORE IMPORT ---
+import 'package:petalert/shared/services/missing_alert_firestore_service.dart';
+
+import 'package:petalert/features/contacts/contacts_list_screen.dart';
+import 'package:petalert/shared/models/contact.dart';
 
 // ignore_for_file: use_build_context_synchronously
 
@@ -22,7 +27,6 @@ class _CreateMissingAlertScreenState extends State<CreateMissingAlertScreen> {
   final _contactPhoneCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
-  // ✅ NEW controllers
   final _microchipCtrl = TextEditingController();
   final _marksCtrl = TextEditingController();
 
@@ -33,6 +37,8 @@ class _CreateMissingAlertScreenState extends State<CreateMissingAlertScreen> {
   DateTime? _lastSeenAt;
   String _status = 'active';
   bool _saving = false;
+
+  Contact? _selectedContact;
 
   @override
   void initState() {
@@ -56,7 +62,6 @@ class _CreateMissingAlertScreenState extends State<CreateMissingAlertScreen> {
     _contactPhoneCtrl.dispose();
     _notesCtrl.dispose();
 
-    // ✅ NEW dispose
     _microchipCtrl.dispose();
     _marksCtrl.dispose();
 
@@ -90,12 +95,29 @@ class _CreateMissingAlertScreenState extends State<CreateMissingAlertScreen> {
     });
   }
 
+  Future<void> _pickContact() async {
+    final contact = await Navigator.of(context).push<Contact>(
+      MaterialPageRoute(
+        builder: (_) => const ContactsListScreen(selectMode: true),
+      ),
+    );
+
+    if (contact != null) {
+      setState(() {
+        _selectedContact = contact;
+        _contactNameCtrl.text = contact.name;
+        _contactPhoneCtrl.text = contact.phone;
+      });
+    }
+  }
+
   String _formatDateTime(DateTime? dt) {
     if (dt == null) return 'Not set';
     final local = dt.toLocal().toString();
     return local.substring(0, 16);
   }
 
+  // --- UPDATED SAVE FUNCTION FOR FIRESTORE ---
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -129,17 +151,15 @@ class _CreateMissingAlertScreenState extends State<CreateMissingAlertScreen> {
             ? null
             : _contactPhoneCtrl.text.trim(),
         notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-
-        // ✅ NEW fields saved
         microchipId:
             _microchipCtrl.text.trim().isEmpty ? null : _microchipCtrl.text.trim(),
         distinguishingMarks:
             _marksCtrl.text.trim().isEmpty ? null : _marksCtrl.text.trim(),
       );
 
-      final current = await MissingAlertStorage.loadAlerts();
-      current.add(alert);
-      await MissingAlertStorage.saveAlerts(current);
+      // Save directly to Firestore!
+      final svc = MissingAlertFirestoreService();
+      await svc.saveAlert(alert);
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -239,6 +259,13 @@ class _CreateMissingAlertScreenState extends State<CreateMissingAlertScreen> {
 
                           const SizedBox(height: 12),
 
+                          OutlinedButton.icon(
+                            onPressed: _pickContact,
+                            icon: const Icon(Icons.contact_phone_rounded),
+                            label: const Text('Select from Contacts'),
+                          ),
+                          const SizedBox(height: 12),
+
                           TextFormField(
                             controller: _contactNameCtrl,
                             textInputAction: TextInputAction.next,
@@ -270,7 +297,6 @@ class _CreateMissingAlertScreenState extends State<CreateMissingAlertScreen> {
 
                           const SizedBox(height: 12),
 
-                          // ✅ NEW: expandable optional details (keeps page short)
                           Card(
                             elevation: 0,
                             color: cs.surfaceContainerHighest,

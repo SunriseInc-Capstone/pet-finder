@@ -8,9 +8,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:petalert/features/pet_profile/pet_list_screen.dart';
 import 'package:petalert/features/missing_alert/missing_alert_list_screen.dart';
 import 'package:petalert/features/pet_profile/add_pet_screen.dart';
+import 'package:petalert/features/contacts/contacts_list_screen.dart';
+import 'package:petalert/features/tips/tips_food_screen.dart';
 
-import 'auth/login_screen.dart'; //
-import 'auth/signup_screen.dart'; //
+// --- NEW REMINDERS IMPORT ---
+import 'package:petalert/features/reminders/reminders_list_screen.dart';
+
+import 'auth/login_screen.dart'; 
+import 'auth/signup_screen.dart'; 
 
 // 🔥 Firebase Initialization
 void main() async {
@@ -34,7 +39,7 @@ class PetAlertApp extends StatelessWidget {
         useMaterial3: true,
         textTheme: GoogleFonts.poppinsTextTheme(),
       ),
-      home: const AuthGate(), // <------ NEW
+      home: const AuthGate(),
     );
   }
 }
@@ -57,7 +62,7 @@ class AuthGate extends StatelessWidget {
 
         // User NOT logged in
         if (!snapshot.hasData) {
-          return const LoginScreen(); // <---- will create this next
+          return const LoginScreen();
         }
 
         // User logged in → show home
@@ -116,7 +121,6 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // YOUR EXISTING HOME UI (shortened)
                 Text(
                   'Main Features',
                   style: GoogleFonts.poppins(
@@ -158,20 +162,38 @@ class HomeScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    const _FeatureCard(
+                    _FeatureCard(
                       'Contacts',
                       Icons.contact_phone_rounded,
                       Colors.indigo,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ContactsListScreen(),
+                          ),
+                        );
+                      },
                     ),
-                    const _FeatureCard(
+                    // --- UPDATED REMINDERS TILE ---
+                    _FeatureCard(
                       'Reminders',
                       Icons.event_available_rounded,
                       Colors.pinkAccent,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const RemindersListScreen()),
+                        );
+                      },
                     ),
-                    const _FeatureCard(
+                    _FeatureCard(
                       'Tips & Foods',
                       Icons.health_and_safety_rounded,
                       Colors.green,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const TipsFoodScreen()),
+                        );
+                      },
                     ),
                   ],
                 ),

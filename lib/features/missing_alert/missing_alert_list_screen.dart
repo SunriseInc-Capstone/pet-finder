@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:petalert/shared/models/missing_alert.dart';
-import 'package:petalert/shared/services/missing_alert_storage.dart';
+
+// --- NEW IMPORT ---
+import 'package:petalert/shared/services/missing_alert_firestore_service.dart';
 
 import 'package:petalert/features/missing_alert/create_missing_alert_screen.dart';
 import 'package:petalert/features/missing_alert/missing_alert_detail_screen.dart';
@@ -13,34 +15,18 @@ class MissingAlertListScreen extends StatefulWidget {
 }
 
 class _MissingAlertListScreenState extends State<MissingAlertListScreen> {
-  List<MissingAlert> _alerts = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAlerts();
-  }
-
-  Future<void> _loadAlerts() async {
-    final list = await MissingAlertStorage.loadAlerts();
-    setState(() {
-      _alerts = list;
-      _loading = false;
-    });
-  }
+  // Initialize the new Firestore service
+  final svc = MissingAlertFirestoreService();
 
   Future<void> _addAlert() async {
-    final ok = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const CreateMissingAlertScreen()),
     );
-
-    if (ok == true) {
-      _loadAlerts();
-    }
+    // No need to reload manually anymore! StreamBuilder does it automatically.
   }
 
-  Future<void> _deleteAlert(int index) async {
+  // Updated to use Firestore
+  Future<void> _deleteAlert(MissingAlert alert) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -63,10 +49,8 @@ class _MissingAlertListScreenState extends State<MissingAlertListScreen> {
 
     if (confirm != true) return;
 
-    final current = List<MissingAlert>.from(_alerts)..removeAt(index);
-    await MissingAlertStorage.saveAlerts(current);
-
-    setState(() => _alerts = current);
+    // Delete directly from Firestore
+    await svc.deleteAlert(alert.id);
   }
 
   @override
@@ -76,12 +60,7 @@ class _MissingAlertListScreenState extends State<MissingAlertListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Missing Alerts'),
-        actions: [
-          IconButton(
-            onPressed: _loadAlerts,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
+        // Removed the refresh button because Firestore updates live automatically!
       ),
 
       floatingActionButton: FloatingActionButton(
@@ -91,102 +70,110 @@ class _MissingAlertListScreenState extends State<MissingAlertListScreen> {
         child: const Icon(Icons.add_alert_rounded),
       ),
 
+      // Use StreamBuilder for real-time cloud data
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _alerts.isEmpty
-            ? const _EmptyState()
-            : RefreshIndicator(
-                onRefresh: _loadAlerts,
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _alerts.length,
-                  itemBuilder: (context, i) {
-                    final alert = _alerts[i];
+        child: StreamBuilder<List<MissingAlert>>(
+          stream: svc.streamAlerts(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-                    return Dismissible(
-                      key: ValueKey(alert.id),
-                      background: Container(
-                        color: Colors.redAccent,
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.only(left: 20),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      secondaryBackground: Container(
-                        color: Colors.redAccent,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      confirmDismiss: (_) async {
-                        await _deleteAlert(i);
-                        return false;
-                      },
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
 
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(12),
+            final alerts = snapshot.data ?? [];
 
-                          // Leading status dot
-                          leading: _StatusDot(status: alert.status),
+            if (alerts.isEmpty) {
+              return const _EmptyState();
+            }
 
-                          // Title + subtitle
-                          title: Text(
-                            alert.petName,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (alert.lastSeenLocation != null &&
-                                  alert.lastSeenLocation!.isNotEmpty)
-                                Text(
-                                  'Last seen: ${alert.lastSeenLocation}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              if (alert.lastSeenAt != null)
-                                Text(
-                                  'At: ${alert.lastSeenAt}',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                            ],
-                          ),
+            return ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: alerts.length,
+              itemBuilder: (context, i) {
+                final alert = alerts[i];
 
-                          // Status badge
-                          trailing: _StatusChip(status: alert.status),
-
-                          // 🚀 Open detail screen
-                          onTap: () async {
-                            final changed = await Navigator.of(context)
-                                .push<bool>(
-                                  MaterialPageRoute(
-                                    builder: (_) => MissingAlertDetailScreen(
-                                      alert: alert,
-                                      index: i,
-                                    ),
-                                  ),
-                                );
-
-                            if (changed == true) {
-                              _loadAlerts();
-                            }
-                          },
-                        ),
-                      ),
-                    );
+                return Dismissible(
+                  key: ValueKey(alert.id),
+                  background: Container(
+                    color: Colors.redAccent,
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 20),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  secondaryBackground: Container(
+                    color: Colors.redAccent,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  confirmDismiss: (_) async {
+                    await _deleteAlert(alert);
+                    return false; // Let StreamBuilder handle UI removal
                   },
-                ),
-              ),
+                  child: Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(12),
+
+                      // Leading status dot
+                      leading: _StatusDot(status: alert.status),
+
+                      // Title + subtitle
+                      title: Text(
+                        alert.petName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (alert.lastSeenLocation != null &&
+                              alert.lastSeenLocation!.isNotEmpty)
+                            Text(
+                              'Last seen: ${alert.lastSeenLocation}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          if (alert.lastSeenAt != null)
+                            Text(
+                              'At: ${alert.lastSeenAt}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                        ],
+                      ),
+
+                      // Status badge
+                      trailing: _StatusChip(status: alert.status),
+
+                      // 🚀 Open detail screen
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => MissingAlertDetailScreen(
+                              alert: alert,
+                              index: i,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
 }
 
+// UI components kept exactly the same!
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 

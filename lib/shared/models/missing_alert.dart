@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ NEW: Required to understand Firestore Timestamps
 
 class MissingAlert {
   final String id;
@@ -78,30 +79,36 @@ class MissingAlert {
         'contactName': contactName,
         'contactPhone': contactPhone,
         'notes': notes,
-
-        // ✅ NEW
         'microchipId': microchipId,
         'distinguishingMarks': distinguishingMarks,
       };
 
-  factory MissingAlert.fromMap(Map<String, dynamic> map) => MissingAlert(
-        id: map['id'] as String,
-        petId: map['petId'] as String,
-        petName: map['petName'] as String,
-        status: map['status'] as String,
-        createdAt: DateTime.parse(map['createdAt'] as String),
-        lastSeenLocation: map['lastSeenLocation'] as String?,
-        lastSeenAt: map['lastSeenAt'] != null
-            ? DateTime.parse(map['lastSeenAt'] as String)
-            : null,
-        contactName: map['contactName'] as String?,
-        contactPhone: map['contactPhone'] as String?,
-        notes: map['notes'] as String?,
+  factory MissingAlert.fromMap(Map<String, dynamic> map) {
+    // ✅ NEW: Helper function to safely read dates from either Firestore or Local Storage
+    DateTime parseDate(dynamic dateData) {
+      if (dateData is Timestamp) {
+        return dateData.toDate(); // It's from Firestore
+      } else if (dateData is String) {
+        return DateTime.parse(dateData); // It's from local storage
+      }
+      return DateTime.now(); // Safe fallback
+    }
 
-        // ✅ NEW (safe for older saved alerts)
-        microchipId: map['microchipId'] as String?,
-        distinguishingMarks: map['distinguishingMarks'] as String?,
-      );
+    return MissingAlert(
+      id: map['id'] as String,
+      petId: map['petId'] as String,
+      petName: map['petName'] as String,
+      status: map['status'] as String,
+      createdAt: parseDate(map['createdAt']), // ✅ UPDATED
+      lastSeenLocation: map['lastSeenLocation'] as String?,
+      lastSeenAt: map['lastSeenAt'] != null ? parseDate(map['lastSeenAt']) : null, // ✅ UPDATED
+      contactName: map['contactName'] as String?,
+      contactPhone: map['contactPhone'] as String?,
+      notes: map['notes'] as String?,
+      microchipId: map['microchipId'] as String?,
+      distinguishingMarks: map['distinguishingMarks'] as String?,
+    );
+  }
 
   // ✅ These two fix your storage errors
   String toJson() => jsonEncode(toMap());
