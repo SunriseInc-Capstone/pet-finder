@@ -39,8 +39,8 @@ class Reminder {
     );
   }
 
+  // 🔥 Firestore-ready map (NO id inside)
   Map<String, dynamic> toMap() => {
-        'id': id,
         'title': title,
         'dueAt': dueAt.toIso8601String(),
         'petId': petId,
@@ -49,8 +49,9 @@ class Reminder {
         'done': done,
       };
 
-  factory Reminder.fromMap(Map<String, dynamic> map) => Reminder(
-        id: map['id'] as String,
+  // 🔥 Firestore-ready fromMap (id comes separately)
+  factory Reminder.fromMap(Map<String, dynamic> map, String id) => Reminder(
+        id: id,
         title: map['title'] as String,
         dueAt: DateTime.parse(map['dueAt'] as String),
         petId: map['petId'] as String?,
@@ -60,5 +61,7 @@ class Reminder {
       );
 
   String toJson() => jsonEncode(toMap());
-  factory Reminder.fromJson(String s) => Reminder.fromMap(jsonDecode(s));
+
+  factory Reminder.fromJson(String s) =>
+      Reminder.fromMap(jsonDecode(s), '');
 }

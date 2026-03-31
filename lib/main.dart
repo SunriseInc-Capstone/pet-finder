@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:petalert/features/pet_profile/pet_list_screen.dart';
@@ -10,17 +9,19 @@ import 'package:petalert/features/missing_alert/missing_alert_list_screen.dart';
 import 'package:petalert/features/pet_profile/add_pet_screen.dart';
 import 'package:petalert/features/contacts/contacts_list_screen.dart';
 import 'package:petalert/features/tips/tips_food_screen.dart';
-
-// --- NEW REMINDERS IMPORT ---
 import 'package:petalert/features/reminders/reminders_list_screen.dart';
 
-import 'auth/login_screen.dart'; 
-import 'auth/signup_screen.dart'; 
+import 'package:petalert/shared/services/reminder_notification_service.dart';
 
-// 🔥 Firebase Initialization
-void main() async {
+import 'auth/login_screen.dart';
+import 'auth/signup_screen.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await ReminderNotificationService.instance.init();
   runApp(const PetAlertApp());
 }
 
@@ -44,7 +45,7 @@ class PetAlertApp extends StatelessWidget {
   }
 }
 
-/// 🔒 Sends user to Login or Home depending on authentication state
+/// Sends user to Login or Home depending on authentication state
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -53,19 +54,16 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // User NOT logged in
         if (!snapshot.hasData) {
           return const LoginScreen();
         }
 
-        // User logged in → show home
         return const HomeScreen();
       },
     );
@@ -93,13 +91,13 @@ class HomeScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final ok = await Navigator.of(
-            context,
-          ).push<bool>(MaterialPageRoute(builder: (_) => const AddPetScreen()));
+          final ok = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(builder: (_) => const AddPetScreen()),
+          );
           if (ok == true && context.mounted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Pet saved!')));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Pet saved!')),
+            );
           }
         },
         icon: const Icon(Icons.add),
@@ -110,7 +108,10 @@ class HomeScreen extends StatelessWidget {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [cs.primaryContainer.withValues(alpha: 0.8), cs.surface],
+            colors: [
+              cs.primaryContainer.withValues(alpha: 0.8),
+              cs.surface,
+            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -130,7 +131,6 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 GridView.count(
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
@@ -174,14 +174,15 @@ class HomeScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    // --- UPDATED REMINDERS TILE ---
                     _FeatureCard(
                       'Reminders',
                       Icons.event_available_rounded,
                       Colors.pinkAccent,
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const RemindersListScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const RemindersListScreen(),
+                          ),
                         );
                       },
                     ),
@@ -191,7 +192,9 @@ class HomeScreen extends StatelessWidget {
                       Colors.green,
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const TipsFoodScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const TipsFoodScreen(),
+                          ),
                         );
                       },
                     ),
